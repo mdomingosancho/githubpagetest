@@ -249,7 +249,7 @@ input[type="password"]:focus { border-color: var(--accent-dk); }
 <script>
 var apiKey = "";
 var systemCtx = "";
-var history = [];
+var chatHistory = [];
 var busy = false;
 
 async function initChat() {
@@ -304,7 +304,7 @@ async function sendMessage(text) {
   document.getElementById("quick-questions").style.display = "none";
 
   appendMsg("user", userText);
-  history.push({ role: "user", content: userText });
+  chatHistory.push({ role: "user", content: userText });
 
   var tid = appendTyping();
   setStatus("enviando petici\u00f3n...");
@@ -325,7 +325,7 @@ async function sendMessage(text) {
         model: "claude-haiku-4-5-20251001",
         max_tokens: 1500,
         system: buildSystem(),
-        messages: history
+        messages: chatHistory
       })
     });
     removeTyping(tid);
@@ -336,7 +336,7 @@ async function sendMessage(text) {
     }
     var d = await r.json();
     var reply = (d.content && d.content[0] && d.content[0].text) || "Sin respuesta.";
-    history.push({ role: "assistant", content: reply });
+    chatHistory.push({ role: "assistant", content: reply });
     appendMsg("assistant", reply);
     setStatus("conectado \u00b7 claude-haiku-4-5");
   } catch(e) {
