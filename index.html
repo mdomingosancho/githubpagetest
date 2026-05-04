@@ -307,9 +307,12 @@ async function sendMessage(text) {
   history.push({ role: "user", content: userText });
 
   var tid = appendTyping();
-  setLoading(true);
+  setStatus("enviando petici\u00f3n...");
+  busy = true;
+  document.getElementById("send-btn").disabled = true;
 
   try {
+    setStatus("conectando con API...");
     var r = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -326,6 +329,7 @@ async function sendMessage(text) {
       })
     });
     removeTyping(tid);
+    setStatus("respuesta recibida HTTP " + r.status);
     if (!r.ok) {
       var errData = await r.json().catch(function() { return {}; });
       throw new Error((errData.error && errData.error.message) || "HTTP " + r.status);
@@ -334,11 +338,14 @@ async function sendMessage(text) {
     var reply = (d.content && d.content[0] && d.content[0].text) || "Sin respuesta.";
     history.push({ role: "assistant", content: reply });
     appendMsg("assistant", reply);
+    setStatus("conectado \u00b7 claude-haiku-4-5");
   } catch(e) {
     removeTyping(tid);
     appendError(e.message);
+    setStatus("error: " + e.message);
   } finally {
-    setLoading(false);
+    busy = false;
+    document.getElementById("send-btn").disabled = false;
   }
 }
 
@@ -388,10 +395,8 @@ function appendError(msg) {
   box.scrollTop = box.scrollHeight;
 }
 
-function setLoading(v) {
-  busy = v;
-  document.getElementById("send-btn").disabled = v;
-  document.getElementById("footer-text").textContent = v ? "consultando..." : "conectado \u00b7 claude-haiku-4-5";
+function setStatus(msg) {
+  document.getElementById("footer-text").textContent = msg;
 }
 
 function fmt(s) {
