@@ -1,0 +1,93 @@
+# MODELO DE DATOS — 3 TABLAS
+
+---
+
+## TABLA 1: empleados.csv
+Granularidad: 1 fila por empleado + asignación a proyecto. Es el nivel más detallado.
+
+| Columna            | Tipo | Descripción                                      |
+|--------------------|------|--------------------------------------------------|
+| employee_id        | int  | Clave primaria del empleado                      |
+| nombre             | str  | Nombre del empleado                              |
+| apellido           | str  | Apellido del empleado                            |
+| departamento       | str  | Departamento al que pertenece                    |
+| fecha_contratacion | date | Formato YYYY-MM-DD                               |
+| salario            | int  | Salario bruto anual (€)                          |
+| activo             | bool | True = empleado activo / False = baja            |
+| proyecto_id        | int  | FK → proyectos.proyecto_id                       |
+| rol                | str  | Valores posibles: líder | desarrollador | analista | operador |
+| horas_dedicadas    | int  | Horas trabajadas en ese proyecto concreto        |
+
+Notas:
+- Un empleado puede aparecer en varias filas si está asignado a varios proyectos.
+- El campo "activo" filtra la plantilla vigente. Los inactivos son bajas históricas.
+- "salario" es bruto anual, no mensual ni neto.
+
+---
+
+## TABLA 2: proyectos.csv
+Granularidad: 1 fila por proyecto. Incluye un campo pre-agregado.
+
+| Columna                 | Tipo | Descripción                                      |
+|-------------------------|------|--------------------------------------------------|
+| proyecto_id             | int  | Clave primaria                                   |
+| nombre_proyecto         | str  | Nombre del proyecto                              |
+| departamento            | str  | Departamento responsable del proyecto            |
+| fecha_inicio            | date | Fecha de inicio (YYYY-MM-DD)                     |
+| fecha_fin               | date | Fecha de fin prevista o real (YYYY-MM-DD)        |
+| presupuesto             | int  | Presupuesto asignado al proyecto (€)             |
+| estado                  | str  | Valores posibles: completado | en_curso          |
+| num_empleados_asignados | int  | Número de empleados asignados (campo pre-agregado) |
+
+Notas:
+- "num_empleados_asignados" es pre-calculado en origen. Puede diferir del COUNT real de empleados.csv.
+- Relación con empleados: empleados.proyecto_id → proyectos.proyecto_id (N:1).
+
+---
+
+## TABLA 3: resumen_departamentos.csv
+Granularidad: 1 fila por departamento. KPIs anuales ya agregados. NO descomponible a nivel individual.
+
+| Columna              | Tipo  | Descripción                                      |
+|----------------------|-------|--------------------------------------------------|
+| departamento         | str   | Clave primaria (nombre del departamento)         |
+| ubicacion            | str   | Ciudad donde se ubica el departamento            |
+| presupuesto_anual    | int   | Presupuesto total del departamento (€)           |
+| objetivo_facturacion | int   | Objetivo de facturación anual fijado (€)         |
+| facturacion_real     | int   | Facturación real conseguida (€)                  |
+| satisfaccion_media   | float | Puntuación media de satisfacción (escala 1–10)   |
+| rotacion_pct         | float | Porcentaje de rotación de personal (0–100)       |
+
+Notas:
+- Esta tabla NO tiene granularidad individual. Sus métricas son totales anuales del departamento.
+- Para cruzar con otras tablas, la clave de unión es el campo "departamento".
+
+---
+
+## RELACIONES ENTRE TABLAS
+
+empleados.departamento   → resumen_departamentos.departamento  (N:1)
+empleados.proyecto_id    → proyectos.proyecto_id               (N:1)
+proyectos.departamento   → resumen_departamentos.departamento  (N:1)
+
+---
+
+## KPIs DERIVADOS
+
+- **% Cumplimiento de facturación** = facturacion_real / objetivo_facturacion × 100
+  Fuente: resumen_departamentos.
+
+- **Coste medio por empleado activo** = SUM(salario) / COUNT(employee_id WHERE activo = True)
+  Fuente: empleados. Solo empleados activos.
+
+- **Horas medias por proyecto** = SUM(horas_dedicadas) / COUNT(DISTINCT proyecto_id)
+  Fuente: empleados.
+
+- **Tasa de rotación** = rotacion_pct
+  Fuente: resumen_departamentos. Valor pre-calculado.
+
+- **Proyectos en curso vs completados** = COUNT por estado
+  Fuente: proyectos.
+
+- **Presupuesto consumido por departamento** = SUM(proyectos.presupuesto) agrupado por proyectos.departamento
+  Nota: distinto de resumen_departamentos.presupuesto_anual.
