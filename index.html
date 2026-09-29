@@ -69,7 +69,8 @@ label {
   letter-spacing: 0.05em;
   margin-bottom: 6px;
 }
-input[type="password"] {
+/* CAMBIO: el estilo ahora se aplica tambien al input de texto del Workspace ID */
+input[type="password"], input[type="text"] {
   width: 100%;
   background: var(--bg);
   border: 1px solid var(--border2);
@@ -81,7 +82,7 @@ input[type="password"] {
   outline: none;
   transition: border-color 0.15s;
 }
-input[type="password"]:focus { border-color: var(--accent-dk); }
+input[type="password"]:focus, input[type="text"]:focus { border-color: var(--accent-dk); }
 .hint { font-size: 12px; color: var(--text3); margin-top: 5px; line-height: 1.5; }
 .btn-primary {
   width: 100%;
@@ -189,6 +190,15 @@ input[type="password"]:focus { border-color: var(--accent-dk); }
       <input type="password" id="api-key-input" placeholder="sk-ant-api03-..." autocomplete="off">
       <p class="hint">Solo se usa durante esta sesi&oacute;n. No se almacena en ning&uacute;n servidor.</p>
     </div>
+
+    <!-- CAMBIO: nuevo campo para el Workspace ID -->
+    <!-- #TOCA (opcional): si quieres que venga relleno, pon tu ID en value="wrkspc_..." -->
+    <div class="field-group">
+      <label>Workspace ID (opcional)</label>
+      <input type="text" id="workspace-input" placeholder="wrkspc_..." value="" autocomplete="off">
+      <p class="hint">Solo si tu API key no est&aacute; asociada a un workspace concreto. Lo encuentras en Settings &rarr; Workspaces de la Claude Console.</p>
+    </div>
+
     <button class="btn-primary" id="connect-btn" onclick="initChat()">Conectar &rarr;</button>
   </div>
 </div>
@@ -224,6 +234,11 @@ input[type="password"]:focus { border-color: var(--accent-dk); }
 
 <script>
 var apiKey = "";
+// CAMBIO: variable para el Workspace ID
+// #TOCA (alternativa): si prefieres no usar el campo del formulario, pon aqui tu ID fijo,
+// por ejemplo "wrkspc_01AbC...". Si el campo del formulario viene relleno, tiene prioridad.
+var DEFAULT_WORKSPACE_ID = "";
+var workspaceId = "";
 var systemCtx = "";
 var chatHistory = [];
 var busy = false;
@@ -231,6 +246,13 @@ var busy = false;
 async function initChat() {
   var key = document.getElementById("api-key-input").value.trim();
   if (!key) { alert("Introduce tu API key."); return; }
+
+  // CAMBIO: leer el Workspace ID del formulario (o usar el fijo)
+  var ws = document.getElementById("workspace-input").value.trim() || DEFAULT_WORKSPACE_ID;
+  if (ws && ws.indexOf("wrkspc_") !== 0) {
+    alert("El Workspace ID debe empezar por wrkspc_");
+    return;
+  }
 
   var btn = document.getElementById("connect-btn");
   btn.textContent = "Conectando...";
@@ -247,6 +269,7 @@ async function initChat() {
   }
 
   apiKey = key;
+  workspaceId = ws; // CAMBIO
   document.getElementById("setup-panel").style.display = "none";
   document.getElementById("chat-panel").style.display = "flex";
   document.getElementById("footer-text").textContent = "conectado";
@@ -289,14 +312,19 @@ async function sendMessage(text) {
 
   try {
     setStatus("conectando con API...");
+
+    // CAMBIO: headers en un objeto para poder anadir el workspace si existe
+    var headers = {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true"
+    };
+    if (workspaceId) headers["anthropic-workspace-id"] = workspaceId;
+
     var r = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "anthropic-dangerous-direct-browser-access": "true"
-      },
+      headers: headers,
       body: JSON.stringify({
         model: "claude-haiku-4-5-20251001",
         max_tokens: 1500,
@@ -317,6 +345,8 @@ async function sendMessage(text) {
     setStatus("conectado");
   } catch(e) {
     removeTyping(tid);
+    // CAMBIO: si falla, quitamos el ultimo mensaje del historial para poder reintentar
+    if (chatHistory.length && chatHistory[chatHistory.length - 1].role === "user") chatHistory.pop();
     appendError(e.message);
     setStatus("error: " + e.message);
   } finally {
@@ -401,8 +431,11 @@ function autoResize(el) {
   el.style.height = Math.min(el.scrollHeight, 120) + "px";
 }
 
-document.getElementById("api-key-input").addEventListener("keydown", function(e) {
-  if (e.key === "Enter") initChat();
+// CAMBIO: Enter tambien funciona desde el campo del Workspace ID
+["api-key-input", "workspace-input"].forEach(function(id) {
+  document.getElementById(id).addEventListener("keydown", function(e) {
+    if (e.key === "Enter") initChat();
+  });
 });
 </script>
 </body>
